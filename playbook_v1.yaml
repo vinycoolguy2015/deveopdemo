@@ -1,0 +1,10 @@
+---
+- name: Install Apache
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Install Apache WebServer On CentOS
+    ansible.builtin.yum:
+      name: httpd
+      state: present
