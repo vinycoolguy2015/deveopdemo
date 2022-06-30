@@ -1,0 +1,63 @@
+---
+- name: Install Apache
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Set fact for RedHat
+    ansible.builtin.set_fact:
+      service: "httpd"
+    when: ansible_facts['os_family'] == "RedHat"
+
+  - name: Set fact for Debian
+    ansible.builtin.set_fact:
+      service: "apache2"
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Install Apache WebServer On CentOS
+    ansible.builtin.yum:
+      name: httpd
+      state: present
+    when: ansible_facts['os_family'] == "RedHat"
+  
+  - name: Install Apache WebServer On Ubuntu
+    ansible.builtin.apt:
+      name: apache2
+      state: present
+    when: ansible_facts['os_family'] == "Debian"
+ 
+  - name: Get System Uptime
+    ansible.builtin.shell: 
+      cmd: "/usr/bin/awk '{print $1}' /proc/uptime"
+    register: system_uptime
+
+  - name: Put System Uptime In Apache Index File
+    ansible.builtin.shell:
+      cmd: "/bin/echo System is running since {{ system_uptime.stdout }} seconds > /var/www/html/index.html"
+
+  - name: Start and Enable Apache service
+    ansible.builtin.service:
+      name: "{{ service }}"
+      state: started
+      enabled: yes
+  
+  - name: Check that website returns a status 200 and fail if the word System is not in the page contents
+    ansible.builtin.uri:
+      url: http://localhost
+      return_content: yes
+    ignore_errors: no
+    register: this
+    failed_when: "'System is running' not in this.content"
+      
+  - name: Change Apache Port to 8080 On CentOS Machine
+    ansible.builtin.shell:
+      cmd: "/usr/bin/sed -i 's/80/8080/g' /etc/httpd/conf/httpd.conf"
+    notify:
+      - Restart Apache Server
+    when: ansible_facts['os_family'] == "RedHat"
+  
+  handlers:
+  - name: Restart Apache Server
+    ansible.builtin.service:
+      name: httpd
+      state: restarted
