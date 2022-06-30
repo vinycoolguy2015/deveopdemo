@@ -1,0 +1,6 @@
+-
+- name: Restart Apache Server
+  ansible.builtin.service:
+    name: "{{ service }}"
+    state: restarted
+  ignore_errors: yes
