@@ -50,8 +50,12 @@
     failed_when: "'System is running' not in this.content"
       
   - name: Change Apache Port to 8080 On CentOS Machine
-    ansible.builtin.shell:
-      cmd: "/usr/bin/sed -i 's/80/8080/g' /etc/httpd/conf/httpd.conf"
+    ansible.builtin.replace:
+      path: /etc/httpd/conf/httpd.conf
+      regexp: '80'
+      replace: '8080'
+    #ansible.builtin.shell:
+    #  cmd: "/usr/bin/sed -i 's/80/8080/g' /etc/httpd/conf/httpd.conf"
     notify:
       - Restart Apache Server
     when: ansible_facts['os_family'] == "RedHat"
