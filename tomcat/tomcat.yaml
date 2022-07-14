@@ -1,0 +1,94 @@
+---
+- name: Install Tomcat On Ubuntu
+  hosts: tomcat
+  become: yes
+
+  tasks:
+  - name: Ansible fact - ansible_date_time
+    ansible.builtin.user:
+      name: tomcat
+      shell: /bin/false
+      home: /opt/tomcat
+  - name: Update all packages to their latest version
+    ansible.builtin.apt:
+      name: "*"
+      state: latest
+  - name: Install JDK
+    ansible.builtin.apt:
+      name: default-jdk
+      state: present
+  - name: Download tomcat
+    ansible.builtin.get_url:
+      url: https://dlcdn.apache.org/tomcat/tomcat-10/v10.0.22/bin/apache-tomcat-10.0.22.tar.gz
+      dest: /tmp
+  - name: Extract Tomcat
+    ansible.builtin.unarchive:
+      src: /tmp/apache-tomcat-10.0.22.tar.gz
+      remote_src: yes
+      dest: /opt/tomcat
+      extra_opts:
+      - --strip-components=1
+  - name: Change file ownership and group 
+    ansible.builtin.file:
+      path: /opt
+      recurse: yes
+      state: directory
+      mode: '0755'
+    ansible.builtin.file:
+      path: /opt/tomcat
+      recurse: yes
+      state: directory
+      owner: tomcat
+      group: tomcat
+      mode: '0755'
+  - name: Change file permissions
+    ansible.builtin.file:
+      path: /opt/tomcat/bin
+      mode: u+x
+      recurse: yes
+      state: directory
+  - name: add Admin Users
+    lineinfile:
+      dest: /opt/tomcat/conf/tomcat-users.xml
+      insertbefore: "</tomcat-users>"
+      line: '{{ item }}'
+    with_items:
+      - <role rolename="manager-gui" />
+      - <user username="manager" password="manager_password" roles="manager-gui" />
+      - <role rolename="admin-gui" />
+      - <user username="admin" password="admin_password" roles="manager-gui,admin-gui" />
+  - name: Copy manager context.xml
+    ansible.builtin.copy:
+      src:  context.xml
+      dest: /opt/tomcat/webapps/manager/META-INF/context.xml
+      owner: tomcat
+      group: tomcat
+      mode: '0640'
+  - name: Copy host manager context.xml
+    ansible.builtin.copy:
+      src:  context2.xml
+      dest: /opt/tomcat/webapps/host-manager/META-INF/context.xml
+      owner: tomcat
+      group: tomcat
+      mode: '0640'
+  - name: Get JAVA Path
+    ansible.builtin.shell:
+      cmd: "/usr/sbin/update-java-alternatives -l | /usr/bin/awk '{print $3}'"
+    register: java_path
+  - name: Set java_path as fact
+    ansible.builtin.set_fact:
+      java_path: "{{ java_path.stdout }}"
+  - name: Create tomcat service
+    ansible.builtin.template:
+      src: tomcat.service.j2
+      dest: /etc/systemd/system/tomcat.service
+  - name: Change script permissions
+    ansible.builtin.file:
+      path: /etc/systemd/system/tomcat.service
+      mode: u+x
+  - name: Start tomcat service, also issue daemon-reload to pick up config changes
+    ansible.builtin.systemd:
+      state: started
+      enabled: yes
+      daemon_reload: yes
+      name: tomcat
